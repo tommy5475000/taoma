@@ -1,0 +1,446 @@
+import { yupResolver } from '@hookform/resolvers/yup'
+import { Autocomplete, Button, Chip, FormControl, InputLabel, MenuItem, Select, TextField } from '@mui/material'
+import React, { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { object, string } from 'yup'
+import style from '../../../component/StyleChung/StyleChung.module.scss'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { getDataNcc } from '../../../apis/Ncc'
+import { getDataLV } from '../../../apis/NhomNganhHang'
+import { addSku } from '../../../apis/Sku'
+import { capitalizeFirstLetter, showAlert } from '../../../component/ModalManager/itemStyle'
+import dayjs from 'dayjs'
+
+const addSkuSchema = object({
+    loai_hang: string(),
+    ma_ncc: string(),
+    ten_sp: string().required("Tên sản phẩm không được để trống"),
+    dvt: string().required("Đơn vị tính không được để trống"),
+    id_nhom: string(),
+    gia_ban: string(),
+    ngay_tao: string(),
+})
+
+export default function CreateSku({ handleClose }) {
+    const queryClient = useQueryClient();
+
+    const [loaiHang, setLoaiHang] = useState(' ');
+    const [nganhHang, setNganhHang] = useState('0')
+    // Sử dụng useState để quản lý trạng thái hiển thị của div
+    const [showSizeInput, setShowSizeInput] = useState(false);
+    const [sizes, setSizes] = useState([]);
+    const [productName, setProductName] = useState("");
+    // Sử dụng useState để quản lý trạng thái hiển thị của div
+    const [showMauInput, setShowMauInput] = useState(false);
+    const [colors, setColors] = useState([]);
+    const [ncc, setNcc] = useState(" ");
+    const [gia_ban, setGia_Ban] = useState({});
+
+
+    const handleChangeLoaiHang = (event) => {
+        setLoaiHang(event.target.value);
+    };
+
+    const handleChangeNcc = (event) => {
+        setNcc(event.target.value);
+    };
+
+    const handleChangeLV = (event) => {
+        setNganhHang(event.target.value)
+    }
+
+    const handleProductNameChange = (event) => {
+        setProductName(event.target.value);
+    };
+
+    // Hàm xử lý khi bấm vào nút "Thêm Size"
+    const handleAddSizeClick = () => {
+        if (showSizeInput) {
+            setSizes([])
+            setGia_Ban({})
+        }
+        setShowSizeInput(prevState => !prevState); // Thay đổi trạng thái để hiển thị div
+    };
+
+
+    // Hàm xử lý khi bấm vào nút "Thêm Màu"
+    const handleAddMauClick = () => {
+        if (showMauInput) {
+            setColors([])
+            setGia_Ban({})
+        }
+        setShowMauInput(prevState => !prevState); // Thay đổi trạng thái để hiển thị div
+    };
+
+    const handleColorChange = (event, newColorValue) => {
+        // format in hoa chữ cái đầu
+        const formattedColors = newColorValue.map(color =>
+            color.charAt(0).toUpperCase() + color.slice(1).toLowerCase()
+        );
+
+        // Xóa trùng
+        const uniqueColors = Array.from(new Set(formattedColors));
+
+        // Update state format màu
+        setColors(uniqueColors);
+    };
+
+    const { data: dataNcc = [] } = useQuery({
+        queryKey: ['dataNcc'],
+        queryFn: getDataNcc
+    });
+
+    const { data: dataNhomLV = [] } = useQuery({
+        queryKey: ['dataNhomLV'],
+        queryFn: getDataLV
+    });
+
+    const { register, handleSubmit, formState: { errors } } = useForm({
+        defaultValues: {
+            loai_hang: "",
+            ma_ncc: "",
+            ten_sp: "",
+            dvt: "",
+            id_nhom: "",
+            size: "",
+            mau: "",
+            gia_ban: "",
+            ngay_tao: "",
+        },
+        resolver: yupResolver(addSkuSchema),
+        mode: "onTouched",
+    })
+
+    const { mutate: onSubmit } = useMutation({
+        mutationFn: (values) => {
+            const formattedValues = {
+                ...values,
+                loai_hang: loaiHang,
+                ma_ncc: ncc,
+                ten_sp: capitalizeFirstLetter(values.ten_sp),
+                dvt: capitalizeFirstLetter(values.dvt),
+                id_nhom: nganhHang,
+                tt_size: sizes,
+                tt_mau: colors,
+                gia_ban: sizes.length === 0 && colors.length === 0 ? gia_ban.default : gia_ban, // Use default price if no size/color is selected
+                ngay_tao: dayjs().toISOString(),
+            };
+
+            console.log(formattedValues);
+            return addSku(formattedValues)
+        },
+
+        onError: (error) => {
+            const errorMessage = error.message || error.messenge || 'Đã xảy ra lỗi';
+            showAlert(errorMessage, 'error');
+        },
+        onSuccess: () => {
+            showAlert('Thành công', 'success')
+            handleClose();
+            queryClient.invalidateQueries({
+                queryKey: ['dataSku']
+            })
+        }
+    })
+
+    // Tạo danh sách các sản phẩm từ các tổ hợp của size và màu
+    let productCombinations = [];
+
+    if (sizes.length > 0 && colors.length > 0) {
+        // Nếu có cả size và màu
+        productCombinations = sizes.flatMap(size =>
+            colors.map(color => ({ size, color }))
+        );
+    } else if (sizes.length > 0) {
+        // Nếu chỉ có size
+        productCombinations = sizes.map(size => ({ size, color: null }));
+    } else if (colors.length > 0) {
+        // Nếu chỉ có màu
+        productCombinations = colors.map(color => ({ size: null, color }));
+    }
+
+    const handlePriceChange = (key, value) => {
+        // Loại bỏ tất cả ký tự không phải số
+        let numericValue = value.replace(/[^0-9]/g, '');
+
+        // Cho phép trường hợp rỗng để người dùng có thể xóa toàn bộ nội dung
+        if (numericValue === "") {
+            setGia_Ban(prevPrices => ({
+                ...prevPrices,
+                [key]: numericValue,
+            }));
+            return; // Cho phép tiếp tục chỉnh sửa mà không hiện cảnh báo
+        }
+
+        // Loại bỏ số 0 đứng đầu nếu có
+        if (numericValue.startsWith('0')) {
+            numericValue = numericValue.replace(/^0+/, '');
+        }
+
+        // Format số với dấu , phân cách hàng nghìn
+        const formattedValue = new Intl.NumberFormat().format(numericValue);
+
+        if ((!sizes || sizes.length === 0) && (!colors || colors.length === 0)) {
+            setGia_Ban({ default: formattedValue });
+        } else {
+            // Cập nhật giá cho tổ hợp size-màu
+            setGia_Ban(prevPrices => ({
+                ...prevPrices,
+                [key]: formattedValue,
+            }));
+        }
+    };
+
+    return (
+        <div>
+            <form onSubmit={handleSubmit(onSubmit)}>
+                <div>
+                    <h3>TẠO MÃ HÀNG</h3>
+                </div>
+
+                <div className={style.js1}>
+                    <InputLabel id="demo-simple-select-standard-label" className={style.js11}>
+                        LOẠI HÀNG
+                    </InputLabel>
+                    <FormControl variant="standard" className={style.js2}   >
+                        <Select
+                            labelId="demo-simple-select-required-label"
+                            id="demo-simple-select-required"
+                            className={style.js21}
+                            onChange={handleChangeLoaiHang}
+                            value={loaiHang}
+                        >
+                            <MenuItem disabled value={" "}>--- Chọn loại hàng ---</MenuItem>
+                            <MenuItem value={"T"}>Thu mua</MenuItem>
+                            <MenuItem value={"K"}>Ký gửi</MenuItem>
+                        </Select>
+                    </FormControl>
+                </div>
+
+                <div className={style.js1}>
+                    <InputLabel id="demo-simple-select-standard-label" className={style.js11}>
+                        MÃ NCC
+                    </InputLabel>
+                    <FormControl variant="standard" className={style.js2}  >
+                        <Select
+                            labelId="demo-simple-select-required-label"
+                            id="demo-simple-select-required"
+                            className={style.js21}
+                            value={ncc}
+                            onChange={handleChangeNcc}
+                        >
+                            {dataNcc.map((item) => (
+                                <MenuItem key={item.ma_ncc} value={item.ma_ncc} disabled={item.ma_ncc === " "}>
+                                    {item.ten_thuong_goi}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                </div>
+
+                <div id="demo-simple-select-standard-label" className={style.js1}>
+                    <InputLabel className={style.js11}>
+                        TÊN SP
+                    </InputLabel>
+                    <TextField error={errors.ten_sp}
+                        variant="standard" {...register("ten_sp")}
+                        helperText={errors.ten_sp?.message}
+                        className={style.js12}
+                        onChange={handleProductNameChange}
+                    />
+                </div>
+
+                <div className={style.js1}>
+                    <InputLabel id="demo-simple-select-standard-label" className={style.js11}>
+                        ĐƠN VỊ TÍNH
+                    </InputLabel>
+                    <TextField error={errors.dvt} variant="standard" {...register("dvt")}
+                        helperText={errors.dvt?.message}
+                        className={style.js12}
+                    />
+                </div>
+
+                <div className={style.js1}>
+                    <InputLabel id="demo-simple-select-standard-label" className={style.js11}>
+                        NHÓM NGÀNH HÀNG
+                    </InputLabel>
+                    <FormControl variant="standard" className={style.js2}  >
+                        <Select
+                            labelId="demo-simple-select-required-label"
+                            id="demo-simple-select-required"
+                            className={style.js21}
+                            value={nganhHang}
+                            onChange={handleChangeLV}
+                        >
+                            {dataNhomLV.map((item) => (
+                                <MenuItem key={item.id_nhom} value={item.id_nhom} disabled={item.id_nhom === 0}>
+                                    {item.ten_lv3}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                </div>
+
+                <div className={style.js1}>
+                    <InputLabel id="demo-simple-select-standard-label" className={style.js11}>
+
+                    </InputLabel>
+                    <Button onClick={handleAddSizeClick}>{showSizeInput ? "Ẩn Size" : "Thêm Size"}</Button>
+                </div>
+
+                {showSizeInput && (
+                    <div>
+                        <Autocomplete
+                            multiple
+                            id="tags-filled"
+                            options={[]}
+                            freeSolo
+                            value={sizes}
+                            onChange={(event, newValue) => {
+                                setSizes(newValue);
+                            }}
+                            renderTags={(value, getTagProps) =>
+                                value.map((option, index) => (
+                                    <Chip
+                                        variant="outlined"
+                                        label={option}
+                                        {...getTagProps({ index })}
+                                    />
+                                ))
+                            }
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    variant="outlined"
+                                    placeholder="Nhập Size"
+                                />
+                            )}
+                        />
+                    </div>
+                )}
+
+                <div className={style.js1}>
+                    <InputLabel id="demo-simple-select-standard-label" className={style.js11}>
+
+                    </InputLabel>
+                    <Button onClick={handleAddMauClick}>{showMauInput ? "Ẩn màu" : "Thêm màu"}</Button>
+                </div>
+
+                {showMauInput && (
+                    <div >
+                        <Autocomplete
+                            multiple
+                            id="tags-filled"
+                            options={[]}
+                            freeSolo
+                            value={colors}
+                            onChange={handleColorChange}
+                            renderTags={(value, getTagProps) =>
+                                value.map((option, index) => (
+                                    <Chip
+                                        variant="outlined"
+                                        label={option}
+                                        {...getTagProps({ index })}
+                                    />
+                                ))
+                            }
+                            renderInput={(paramsColors) => (
+                                <TextField
+                                    {...paramsColors}
+                                    variant="outlined"
+                                    placeholder="Nhập Màu"
+                                />
+                            )}
+                        />
+                    </div>
+                )}
+
+                {/* {productCombinations.length === 0 ? (
+                    // Show the main price input if there are no size or color combinations
+                    <div className={style.js1}>
+                        <InputLabel id="demo-simple-select-standard-label" className={style.js11}>
+                            GIÁ BÁN
+                        </InputLabel>
+                        <TextField error={errors.gia_ban} variant="standard" {...register("gia_ban")}
+                            helperText={errors.gia_ban?.message}
+                            className={style.js12}
+                            value={gia_ban.default || ""} // Use the default price
+                            onChange={(e) => handlePriceChange("default", e.target.value)} // Update the default price
+                        />
+                    </div>
+                ) : (
+                    productCombinations.map(({ size, color }, index) => {
+                        const key = `${size || ''}-${color || ''}`;
+                        return (
+                            <>
+                                <div key={index}>
+                                    <p>Sản phẩm: {productName}</p>
+                                </div>
+                                <div className={style.js1} key={key}>
+                                    <InputLabel id="demo-simple-select-standard-label" className={style.js11}>
+                                        {`${size ? `Size: ${size}` : ""}${color ? ` - Màu: ${color}` : ""}`}
+                                    </InputLabel>
+                                    <TextField
+                                        placeholder='GIÁ BÁN'
+                                        variant="standard"
+                                        value={gia_ban[key] || ""}
+                                        onChange={(e) => handlePriceChange(key, e.target.value)}
+                                        className={style.js12}
+                                    />
+                                </div>
+                            </>
+
+                        );
+                    })
+                )} */}
+
+
+                {productCombinations.length === 0 && (
+                    <div className={style.js1}>
+                        <InputLabel className={style.js11}>Giá bán</InputLabel>
+                        <TextField
+                            error={errors.gia_ban}
+                            helperText={errors.gia_ban?.message}
+                            value={gia_ban.default || ''}
+                            onChange={(e) => handlePriceChange('default', e.target.value)}
+                            className={style.js12}
+                        />
+                    </div>
+                )}
+
+                {productCombinations.length > 0 && (
+                    <div>
+                        <h4>Tổ hợp sản phẩm:</h4>
+                        {productCombinations.map((combination, index) => {
+                            const key = `${combination.size || ''}-${combination.color || ''}`;
+
+                            return (
+                                <div key={index}>
+                                    {combination.size && (
+                                        <span>Size: {combination.size} </span>
+                                    )}
+                                    {combination.color && (
+                                        <span>Màu: {combination.color}</span>
+                                    )}
+                                    <TextField
+                                        label={`Giá cho tổ hợp ${key}`}
+                                        value={gia_ban[key] || ''}
+                                        onChange={(e) =>
+                                            handlePriceChange(key, e.target.value)
+                                        }
+                                        className={style.js12}
+                                    />
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                <div>
+                    <Button type='submit'> Tạo</Button>
+                    <Button onClick={handleClose}>hủy</Button>
+                </div>
+            </form>
+        </div>
+    )
+}

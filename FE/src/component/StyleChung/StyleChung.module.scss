@@ -1,0 +1,21 @@
+.js1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+  .js11 {
+    flex-basis: 180px;
+  }
+  .js12{
+    min-width: 250px;
+  }
+}
+
+.js2 {
+  display: "inline-block";
+  align-items: "center";
+  .js21 {
+    min-width: 250px;
+  }
+}
+

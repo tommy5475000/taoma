@@ -1,0 +1,251 @@
+import React, { useState } from "react";
+import _ from "lodash";
+import { Button, Space, Table } from "antd";
+import { Box, Modal } from '@mui/material';
+import CreateSku from '../../modules/CreateSku';
+
+const data = [
+  {
+    key: "1",
+    sku: "KANA10405901",
+    productName: "Áo thun bé gái 2 dây bính bông ngựa",
+    productInfo: "New York No. 1 Lake Park"
+  },
+  {
+    key: "2",
+    sku: "Jim Green",
+    productName: 42,
+    productInfo: "London No. 1 Lake Park"
+  },
+  {
+    key: "3",
+    sku: "Joe Black",
+    productName: 32,
+    productInfo: "Sidney No. 1 Lake Park"
+  },
+  {
+    key: "4",
+    sku: "Jim Red",
+    productName: 32,
+    productInfo: "London No. 2 Lake Park"
+  }
+];
+
+const filterData = (data) => (formatter) =>
+  data.map((item) => ({
+    text: formatter(item),
+    value: formatter(item)
+  }));
+
+// const onChange = (pagination, filters, sorter, extra) => {
+//   console.log("params", pagination, filters, sorter, extra);
+// };
+
+const styleModal = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  width: 400,
+  bgcolor: 'background.paper',
+  border: '2px solid #000',
+  boxShadow: 24,
+  pt: 2,
+  px: 4,
+  pb: 3,
+};
+
+const App = () => {
+  const [filteredInfo, setFilteredInfo] = useState({});
+
+  const [sortedInfo, setSortedInfo] = useState({});
+
+  const [selectionType, setSelectionType] = useState('checkbox');
+
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+
+  const handleChange = (pagination, filters, sorter) => {
+    console.log("Various parameters", pagination, filters, sorter);
+    setFilteredInfo(filters);
+    setSortedInfo(sorter);
+  };
+
+  //----- modal tạo mã -----
+  const [open, setOpen] = useState(false);
+  const handleOpenTaoMa = () => {
+    setOpen(true);
+  };
+  const handleCloseTaoMa = () => {
+    setOpen(false);
+  };
+  //----- modal tạo mã -----
+
+  const rowSelection = {
+    onChange: (selectedRowKeys, selectedRows) => {
+      console.log(`selectedRowKeys: ${selectedRowKeys}`, 'selectedRows: ', selectedRows);
+      setSelectedRowKeys(selectedRowKeys);
+    },
+    getCheckboxProps: (record) => ({
+      disabled: record.name === 'Disabled User',
+      // Column configuration not to be checked
+      name: record.name,
+
+    }),
+    width: "5"
+  };
+
+  const clearAll = () => {
+    setFilteredInfo({});
+    setSortedInfo({});
+    setSelectedRowKeys([]);
+  };
+
+  const columns = [
+    {
+      title: "SKU",
+      dataIndex: "sku",
+      sorter: (a, b) => a.sku.length - b.sku.length, // sort a tới z
+      filters: _.uniqWith(                           // fitter sku 
+        filterData(data)((i) => i.sku),
+        _.isEqual
+      ),
+      filteredValue: filteredInfo.sku || null,
+      // filterMode: "tree",
+      filterSearch: true,
+      onFilter: (value, record) => record.sku.includes(value),
+      width: "5%"
+    },
+    {
+      title: "TÊN SP",
+      dataIndex: "productName",
+      sorter: (a, b) => a.productName - b.productName,
+      filters: _.uniqWith(
+        filterData(data)((i) => i.productName),
+        _.isEqual
+      ),
+      filterSearch: true,
+      filteredValue: filteredInfo.productName || null,
+      onFilter: (value, record) =>
+        record["productName"].toString().toLowerCase().includes(value),
+      width: "10%"
+    },
+    {
+      title: "TÊN SP + THUỘC TÍNH",
+      dataIndex: "productInfo",
+      sorter: (a, b) => a.productInfo.length - b.productInfo.length,
+      filters: _.uniqWith(
+        filterData(data)((i) => i.productInfo),
+        _.isEqual
+      ),
+      filteredValue: filteredInfo.productInfo || null,
+      onFilter: (value, record) => record.productInfo.startsWith(value),
+      filterSearch: true,
+      width: "25%"
+    },
+    {
+      title: "ĐƠN VỊ TÍNH",
+      dataIndex: "dvt",
+      sorter: (a, b) => a.dvt.length - b.dvt.length,
+      filters: _.uniqWith(
+        filterData(data)((i) => i.dvt),
+        _.isEqual
+      ),
+      filteredValue: filteredInfo.dvt || null,
+      onFilter: (value, record) => record.dvt.startsWith(value),
+      filterSearch: true,
+      width: "10%"
+    },
+    {
+      title: "MÃ VẠCH",
+      dataIndex: "barcode",
+      sorter: (a, b) => a.barcode.length - b.barcode.length,
+      filters: _.uniqWith(
+        filterData(data)((i) => i.barcode),
+        _.isEqual
+      ),
+      filteredValue: filteredInfo.barcode || null,
+      onFilter: (value, record) => record.barcode.startsWith(value),
+      filterSearch: true,
+      width: "15%"
+    },
+    {
+      title: "TÊN THƯỜNG GỌI",
+      dataIndex: "tenthuonggoi",
+      sorter: (a, b) => a.barcode.length - b.barcode.length,
+      filters: _.uniqWith(
+        filterData(data)((i) => i.barcode),
+        _.isEqual
+      ),
+      filteredValue: filteredInfo.barcode || null,
+      onFilter: (value, record) => record.barcode.startsWith(value),
+      filterSearch: true,
+      width: "15%"
+    },
+    {
+      title: "LOẠI HÀNG",
+      dataIndex: "loaihang",
+      sorter: (a, b) => a.barcode.length - b.barcode.length,
+      filters: _.uniqWith(
+        filterData(data)((i) => i.barcode),
+        _.isEqual
+      ),
+      filteredValue: filteredInfo.barcode || null,
+      onFilter: (value, record) => record.barcode.startsWith(value),
+      filterSearch: true,
+      width: "10%"
+    },
+
+  ];
+
+  console.log("columns", columns);
+  return (
+    <div>
+      <>
+        <Space
+          style={{
+            marginBottom: 16
+          }}
+        >
+          <div>
+            <Button onClick={clearAll}>Clear filters and sorters</Button>
+          </div>
+          <div>
+            <Button onClick={handleOpenTaoMa}>Tạo Mã</Button>
+            <Button >Xóa</Button>
+          </div>
+        </Space>
+      </>
+
+      < Table
+        size="small"
+        rowSelection={{
+          type: selectionType,
+          ...rowSelection,
+          selectedRowKeys: selectedRowKeys,
+        }}
+        columns={columns}
+        dataSource={data}
+        onChange={handleChange}
+
+      />
+
+      {/* Modal tạo mã */}
+      <Modal
+        open={open}
+        onClose={handleCloseTaoMa}
+        aria-labelledby="child-modal-title"
+        aria-describedby="child-modal-description"
+      >
+        <Box sx={{ ...styleModal, width: 450 }}>
+          <CreateSku handleCloseTaoMa={handleCloseTaoMa} />
+        </Box>
+      </Modal>
+
+    </div >
+  );
+
+};
+
+export default App;
+
+

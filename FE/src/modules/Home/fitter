@@ -1,0 +1,150 @@
+import React, { useState } from "react";
+// import "antd/dist/antd.css";
+import _ from "lodash";
+import { Button, Space, Table } from "antd";
+
+const data = [
+  {
+    key: "1",
+    sku: "KANA10405901",
+    productName: "Áo thun bé gái 2 dây bính bông ngựa",
+    productInfo: "New York No. 1 Lake Park"
+  },
+  {
+    key: "2",
+    sku: "Jim Green",
+    productName: 42,
+    productInfo: "London No. 1 Lake Park"
+  },
+  {
+    key: "3",
+    sku: "Joe Black",
+    productName: 32,
+    productInfo: "Sidney No. 1 Lake Park"
+  },
+  {
+    key: "4",
+    sku: "Jim Red",
+    productName: 32,
+    productInfo: "London No. 2 Lake Park"
+  }
+];
+
+const filterData = (data) => (formatter) =>
+  data.map((item) => ({
+    text: formatter(item),
+    value: formatter(item)
+  }));
+
+const onChange = (pagination, filters, sorter, extra) => {
+  console.log("params", pagination, filters, sorter, extra);
+};
+
+const App = () => {
+  const [filteredInfo, setFilteredInfo] = useState({});
+  const [sortedInfo, setSortedInfo] = useState({});
+
+  const handleChange = (pagination, filters, sorter) => {
+    console.log("Various parameters", pagination, filters, sorter);
+    setFilteredInfo(filters);
+    setSortedInfo(sorter);
+  };
+
+  const clearAll = () => {
+    setFilteredInfo({});
+    setSortedInfo({});
+  };
+
+  const columns = [
+    {
+      title: "SKU",
+      dataIndex: "sku",
+      sorter: (a, b) => a.sku.length - b.sku.length,
+      filters: _.uniqWith(
+        filterData(data)((i) => i.sku),
+        _.isEqual
+      ),
+      filteredValue: filteredInfo.sku || null,
+      // filterMode: "tree",
+      filterSearch: true,
+      onFilter: (value, record) => record.sku.includes(value),
+      width: "5%"
+    },
+    {
+      title: "TÊN SP",
+      dataIndex: "productName",
+      sorter: (a, b) => a.productName - b.productName,
+      filters: _.uniqWith(
+        filterData(data)((i) => i.productName),
+        _.isEqual
+      ),
+      filterSearch: true,
+      filteredValue: filteredInfo.productName || null,
+      onFilter: (value, record) =>
+        record["productName"].toString().toLowerCase().includes(value),
+      width: "10%"
+    },
+    {
+      title: "TÊN SP + THUỘC TÍNH",
+      dataIndex: "productInfo",
+      sorter: (a, b) => a.productInfo.length - b.productInfo.length,
+      filters: _.uniqWith(
+        filterData(data)((i) => i.productInfo),
+        _.isEqual
+      ),
+      filteredValue: filteredInfo.productInfo || null,
+      onFilter: (value, record) => record.productInfo.startsWith(value),
+      filterSearch: true,
+      width: "20%"
+    },
+    {
+      title: "ĐƠN VỊ TÍNH",
+      dataIndex: "dvt",
+      sorter: (a, b) => a.dvt.length - b.dvt.length,
+      filters: _.uniqWith(
+        filterData(data)((i) => i.dvt),
+        _.isEqual
+      ),
+      filteredValue: filteredInfo.dvt || null,
+      onFilter: (value, record) => record.dvt.startsWith(value),
+      filterSearch: true,
+      width: "20%"
+    },
+    {
+      title: "MÃ VẠCH",
+      dataIndex: "barcode",
+      sorter: (a, b) => a.barcode.length - b.barcode.length,
+      filters: _.uniqWith(
+        filterData(data)((i) => i.barcode),
+        _.isEqual
+      ),
+      filteredValue: filteredInfo.barcode || null,
+      onFilter: (value, record) => record.barcode.startsWith(value),
+      filterSearch: true,
+      width: "20%"
+    }
+  ];
+
+  console.log("columns", columns);
+
+  return (
+    <>
+      <Space
+        style={{
+          marginBottom: 16
+        }}
+      >
+
+        <Button onClick={clearAll}>Clear filters and sorters</Button>
+      </Space>
+      <Table
+        size="small"
+        columns={columns}
+        dataSource={data}
+        onChange={handleChange}
+      />
+    </>
+  );
+};
+
+export default App;
