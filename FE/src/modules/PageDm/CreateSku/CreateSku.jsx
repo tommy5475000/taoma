@@ -1,132 +1,147 @@
-import React, { useState } from "react";
-import * as Yup from "yup";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
+import { object, string } from 'yup'
 
-const schema = Yup.object().shape({
-  maHang: Yup.string().required("Mã hàng là bắt buộc"),
-  giaBan: Yup.lazy((value, context) => {
-    const { size, mau } = context.parent;
-    if (size && mau) {
-      return Yup.number()
-        .required("Giá bán là bắt buộc khi có size và màu")
-        .positive("Giá bán phải là số dương");
-    }
-    if (!size && !mau) {
-      return Yup.number()
-        .required("Giá bán là bắt buộc khi không có size và màu")
-        .positive("Giá bán phải là số dương");
-    }
-    return Yup.number().optional(); // Nếu chỉ có size hoặc màu, giá bán là tùy chọn
-  }),
-  size: Yup.string().optional(),
-  mau: Yup.string().optional(),
+const schema = object().shape({
+  loai_hang: string(),
+  ma_ncc: string(),
+  ten_sp: string().required("Tên sản phẩm không được để trống"),
+  dvt: string().required("Đơn vị tính không được để trống"),
+  id_nhom: string(),
+  gia_ban: string(),
+  size: string().optional(),
+  mau: string().optional(),
 });
 
-const ProductForm = () => {
-  const {
-    register,
-    handleSubmit,
-    watch,
-    formState: { errors },
-  } = useForm({
-    resolver: yupResolver(schema),
-  });
+export default function CreateSku({ handleClose }) {
+  const ProductForm = () => {
+    const {
+      register,
+      watch,
+      handleSubmit,
+      formState: { errors },
+    } = useForm({
+      resolver: yupResolver(schema),
+    });
 
-  const [productVariants, setProductVariants] = useState([]);
+    const [productVariants, setProductVariants] = useState([]);
 
-  const watchSize = watch("size");
-  const watchMau = watch("mau");
+    const watchSize = watch("size");
+    const watchMau = watch("mau");
+    const watchMaHang = watch("ten_sp");
 
-  const onSubmit = (data) => {
-    let variants = [];
+    useEffect(() => {
+      if (watchSize || watchMau) {
+        let variants = [];
+        const sizes = watchSize ? watchSize.split(",").map(size => size.trim()) : [""];
+        const colors = watchMau ? watchMau.split(",").map(mau => mau.trim()) : [""];
 
-    const sizes = data.size ? data.size.split(",").map((size) => size.trim()) : [""];
-    const colors = data.mau ? data.mau.split(",").map((mau) => mau.trim()) : [""];
-
-    if (sizes.length > 1 || colors.length > 1 || sizes[0] || colors[0]) {
-      sizes.forEach((size) => {
-        colors.forEach((mau) => {
-          variants.push({
-            maHang: data.maHang,
-            size: size || "Không có size",
-            mau: mau || "Không có màu",
-            giaBan: "",
+        sizes.forEach(size => {
+          colors.forEach(mau => {
+            variants.push({
+              ten_sp: watchMaHang || "Mã hàng chưa nhập",
+              size: size || "Không có size",
+              mau: mau || "Không có màu",
+              gia_ban: "",
+            });
           });
         });
+
+        setProductVariants(variants);
+      } else {
+        setProductVariants([]);
+      }
+    }, [watchSize, watchMau, watchMaHang]);
+
+    const onSubmit = (data) => {
+
+      // Kiểm tra xem giá bán có được nhập khi không có size và màu
+      if (!watchSize && !watchMau && !data.gia_ban) {
+        alert("Vui lòng nhập giá bán.");
+        return;
+      }
+
+      // Kiểm tra xem tất cả các biến thể đều có giá bán nếu size và màu đã được cung cấp
+      const allVariantsValid = productVariants.every(variant => {
+        return (variant.size && variant.mau) ? Boolean(variant.gia_ban) : true;
       });
-    } else {
-      variants.push({
-        maHang: data.maHang,
-        size: "Không có size",
-        mau: "Không có màu",
-        giaBan: data.giaBan,
-      });
-    }
 
-    setProductVariants(variants);
-  };
+      if (!allVariantsValid) {
+        alert("Vui lòng nhập giá bán cho tất cả các thuộc tính.");
+        return;
+      }
 
-  const handleVariantPriceChange = (index, event) => {
-    const newVariants = [...productVariants];
-    newVariants[index].giaBan = event.target.value;
-    setProductVariants(newVariants);
-  };
 
-  return (
-    <div>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <div>
-          <label>Mã hàng</label>
-          <input {...register("maHang")} />
-          {errors.maHang && <p>{errors.maHang.message}</p>}
-        </div>
+      const combinedData = {
+        ...data,
+        productVariants,
+      };
 
-        {(!watchSize && !watchMau) && (
+      console.log("Combined Data:", combinedData);
+    };
+
+    const handleVariantPriceChange = (index, event) => {
+      const newVariants = [...productVariants];
+      newVariants[index].gia_ban = event.target.value;
+      setProductVariants(newVariants);
+    };
+
+    return (
+      <div>
+        <form onSubmit={handleSubmit(onSubmit)}>
           <div>
-            <label>Giá bán</label>
-            <input type="number" {...register("giaBan")} />
-            {errors.giaBan && <p>{errors.giaBan.message}</p>}
+            <label>Mã hàng</label>
+            <input {...register("ten_sp")} />
+            {errors.ten_sp && <p>{errors.ten_sp.message}</p>}
           </div>
-        )}
 
-        <div>
-          <label>Size (Tùy chọn, nhập cách nhau bởi dấu phẩy)</label>
-          <input {...register("size")} />
-          {errors.size && <p>{errors.size.message}</p>}
-        </div>
+          {/* Display giaBan input if no size or mau is provided */}
+          {(!watchSize && !watchMau) && (
+            <div>
+              <label>Giá bán</label>
+              <input type="number" {...register("gia_ban")} />
+              {errors.gia_ban && <p>{errors.gia_ban.message}</p>}
+            </div>
+          )}
 
-        <div>
-          <label>Màu (Tùy chọn, nhập cách nhau bởi dấu phẩy)</label>
-          <input {...register("mau")} />
-          {errors.mau && <p>{errors.mau.message}</p>}
-        </div>
+          <div>
+            <label>Size (Tùy chọn, nhập cách nhau bởi dấu phẩy)</label>
+            <input {...register("size")} />
+            {errors.size && <p>{errors.size.message}</p>}
+          </div>
 
-        <button type="submit">Tạo mã hàng</button>
-      </form>
+          <div>
+            <label>Màu (Tùy chọn, nhập cách nhau bởi dấu phẩy)</label>
+            <input {...register("mau")} />
+            {errors.mau && <p>{errors.mau.message}</p>}
+          </div>
 
-      {productVariants.length > 0 && (
-        <div>
-          <h3>Danh sách biến thể sản phẩm:</h3>
-          <ul>
-            {productVariants.map((variant, index) => (
-              <li key={index}>
-                <p>Tên sản phẩm: {variant.maHang}</p>
-                <p>Size: {variant.size}</p>
-                <p>Màu: {variant.mau}</p>
-                <input
-                  type="number"
-                  placeholder="Nhập giá bán"
-                  value={variant.giaBan}
-                  onChange={(e) => handleVariantPriceChange(index, e)}
-                />
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-};
+          {/* Dynamically render product variants if sizes or colors are provided */}
+          {productVariants.length > 0 && (
+            <div>
+              <h3>Danh sách biến thể sản phẩm:</h3>
+              <ul>
+                {productVariants.map((variant, index) => (
+                  <li key={index}>
+                    <p>Tên sản phẩm: {variant.ten_sp}</p>
+                    <p>Size: {variant.size}</p>
+                    <p>Màu: {variant.mau}</p>
+                    <input
+                      type="number"
+                      placeholder="Nhập giá bán"
+                      value={variant.gia_ban}
+                      onChange={(e) => handleVariantPriceChange(index, e)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-export default ProductForm;
+          <button type="submit">Tạo mã hàng</button>
+        </form>
+      </div>
+    );
+  }
+}
