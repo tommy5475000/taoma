@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { object, string } from 'yup'
-import { Autocomplete, Button, Chip, FormControl, InputLabel, MenuItem, Select, TextField } from "@mui/material";
+import { number, object, string } from 'yup'
+import { Button, FormControl, InputLabel, MenuItem, Select, TextField } from "@mui/material";
 import style from '../../../component/StyleChung/StyleChung.module.scss'
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getDataNcc } from "../../../apis/Ncc";
 import { getDataLV } from "../../../apis/NhomNganhHang";
+import { capitalizeFirstLetter, showAlert } from "../../../component/ModalManager/itemStyle";
+import dayjs from "dayjs";
+import { addSku } from "../../../apis/Sku";
 
 const schema = object().shape({
   loai_hang: string(),
@@ -14,16 +17,25 @@ const schema = object().shape({
   ten_sp: string().required("Tên sản phẩm không được để trống"),
   dvt: string().required("Đơn vị tính không được để trống"),
   id_nhom: string(),
+  loai_thue: string(),
   gia_ban: string(),
   size: string().optional(),
   mau: string().optional(),
 });
 
 export default function CreateSku({ handleClose }) {
+  const queryClient = useQueryClient();
+
   const [productVariants, setProductVariants] = useState([]);
   const [loaiHang, setLoaiHang] = useState(" ");
   const [ncc, setNcc] = useState(" ");
   const [nganhHang, setNganhHang] = useState("0");
+  const [loaiThue, setLoaiThue] = useState(' ')
+
+  const handleChangeVat = (event) => {
+    setLoaiThue(event.target.value)
+
+  }
 
   const handleChangeLoaiHang = (event) => {
     setLoaiHang(event.target.value)
@@ -51,9 +63,20 @@ export default function CreateSku({ handleClose }) {
     register,
     watch,
     handleSubmit,
-    control,
     formState: { errors },
   } = useForm({
+    defaultValues: {
+      loai_hang: "",
+      ma_ncc: "",
+      ten_sp: "",
+      dvt: "",
+      id_nhom: "",
+      size: "",
+      mau: "",
+      loai_thue: "",
+      gia_ban: "",
+      ngay_tao: "",
+    },
     resolver: yupResolver(schema),
     mode: "onTouched"
   })
@@ -73,8 +96,8 @@ export default function CreateSku({ handleClose }) {
         colors.forEach(mau => {
           variants.push({
             ten_sp: watchMaHang || "Mã hàng chưa nhập",
-            size: size || "Không có size",
-            mau: mau || "Không có màu",
+            size: size || "",
+            mau: mau || "",
             gia_ban: "",
           });
         });
@@ -86,31 +109,52 @@ export default function CreateSku({ handleClose }) {
     }
   }, [watchSize, watchMau, watchMaHang]);
 
-  const onSubmit = (data) => {
+  const { mutate: onSubmit } = useMutation({
+    mutationFn: (values) => {
 
-    // Kiểm tra xem giá bán có được nhập khi không có size và màu
-    if (!watchSize && !watchMau && !data.gia_ban) {
-      alert("Vui lòng nhập giá bán.");
-      return;
-    }
+      // Kiểm tra xem giá bán có được nhập khi không có size và màu
+      if (!watchSize && !watchMau && !values.gia_ban) {
+        alert("Vui lòng nhập giá bán.");
+        return Promise.reject(); // sẽ báo không đúng sẽ dừng ngay
+      }
 
-    // Kiểm tra xem tất cả các biến thể đều có giá bán nếu size và màu đã được cung cấp
-    const allVariantsValid = productVariants.every(variant => {
-      return (variant.size && variant.mau) ? Boolean(variant.gia_ban) : true;
-    });
+      // Kiểm tra xem tất cả các biến thể đều có giá bán nếu size và màu đã được cung cấp
+      const allVariantsValid = productVariants.every(variant => {
+        return (variant.size && variant.mau) ? Boolean(variant.gia_ban) : true;
+      });
 
-    if (!allVariantsValid) {
-      alert("Vui lòng nhập giá bán cho tất cả các thuộc tính.");
-      return;
-    }
+      if (!allVariantsValid) {
+        alert("Vui lòng nhập giá bán cho tất cả các thuộc tính.");
+        return Promise.reject();
+      }
+      const defaultValues = {
+        ...values,
+        loai_hang: loaiHang,
+        ma_ncc: ncc,
+        ten_sp: capitalizeFirstLetter(values.ten_sp),
+        dvt: capitalizeFirstLetter(values.dvt),
+        id_nhom: nganhHang,
+        loai_thue: loaiThue,
+        gia_ban: values.gia_ban,
+        ngay_tao: dayjs().toISOString(),
+        productVariants,
+      }
 
-    const combinedData = {
-      ...data,
-      productVariants,
-    };
-
-    console.log("Combined Data:", combinedData);
-  };
+      console.log("Combined Data:", defaultValues);
+      return addSku(defaultValues)
+    },
+    onError: (error) => {
+      const errorMessage = error.message || error.messenge || 'Đã xảy ra lỗi';
+      showAlert(errorMessage, 'error');
+    },
+    onSuccess: () => {
+      showAlert('Thành công', 'success')
+      handleClose();
+      queryClient.invalidateQueries({
+        queryKey: ['dataSku']
+      })
+    },
+  })
 
   const handleVariantPriceChange = (index, event) => {
     const newVariants = [...productVariants];
@@ -143,7 +187,7 @@ export default function CreateSku({ handleClose }) {
                 value={' '}
                 disabled
               >
-                --- CHỌN LOẠI HÀNG ---
+                --- Chọn loại hàng ---
               </MenuItem>
 
               <MenuItem
@@ -159,8 +203,6 @@ export default function CreateSku({ handleClose }) {
               </MenuItem>
             </Select>
           </FormControl>
-          {/* <input {...register("ten_sp")} />
-          {errors.ten_sp && <p>{errors.ten_sp.message}</p>} */}
         </div>
 
         <div className={style.js1}>
@@ -200,6 +242,7 @@ export default function CreateSku({ handleClose }) {
             helperText={errors.ten_sp?.message}
             variant="standard"
             className={style.js12}
+            placeholder="Vui lòng nhập tên hàng"
           />
         </div>
 
@@ -213,6 +256,7 @@ export default function CreateSku({ handleClose }) {
             helperText={errors.dvt?.message}
             variant="standard"
             className={style.js12}
+            placeholder="Vui lòng nhập đơn vị tính"
           />
         </div>
 
@@ -243,63 +287,82 @@ export default function CreateSku({ handleClose }) {
           </FormControl>
         </div>
 
-        {/* Display giaBan input if no size or mau is provided */}
+        <div className={style.js1}>
+          <InputLabel className={style.js11}>
+            Thuộc tính size
+          </InputLabel>
+          <TextField
+            variant="standard"
+            error={errors.size}
+            {...register("size")}
+            helperText={errors.size?.message}
+            className={style.js12}
+            placeholder="nhập cách nhau bởi dấu phẩy"
+          />
+        </div>
+
+        <div className={style.js1}>
+          <InputLabel className={style.js11}>
+            Thuộc tính màu
+          </InputLabel>
+          <TextField
+            variant="standard"
+            error={errors.mau}
+            {...register("mau")}
+            helperText={errors.mau?.message}
+            className={style.js12}
+            placeholder="nhập cách nhau bởi dấu phẩy"
+          />
+        </div>
+
+        <div className={style.js1}>
+          <InputLabel className={style.js11}>
+            Loại thuế
+          </InputLabel>
+          <FormControl
+            className={style.js12}
+            variant="standard"
+          >
+            <Select
+              value={loaiThue}
+              onChange={handleChangeVat}
+            >
+              <MenuItem value={" "} disabled>
+                --- Chọn loại thuế ---
+              </MenuItem>
+              <MenuItem value={0}>
+                0%
+              </MenuItem>
+              <MenuItem value={5}>
+                5%
+              </MenuItem>
+              <MenuItem value={8}>
+                8%
+              </MenuItem>
+              <MenuItem value={10}>
+                10%
+              </MenuItem>
+            </Select>
+          </FormControl>
+        </div>
+
         {(!watchSize && !watchMau) && (
-          <div>
-            <label>Giá bán</label>
-            <input type="number" {...register("gia_ban")} />
-            {errors.gia_ban && <p>{errors.gia_ban.message}</p>}
+          <div className={style.js1}>
+            <InputLabel className={style.js11}>
+              Giá bán
+            </InputLabel>
+            <TextField
+              type="number"
+              error={errors.gia_ban}
+              {...register("gia_ban")}
+              helperText={errors.gia_ban?.message}
+              variant="standard"
+              className={style.js12}
+              placeholder="Vui lòng nhập giá bán"
+            />
+
           </div>
         )}
-
-        <Controller
-          name="size"
-          control={control}
-          defaultValue={[]}
-          render={({ field }) => (
-            <Autocomplete
-              {...field}
-              multiple
-              id="tags-filled"
-              freeSolo
-              options={[]} // nếu bạn có một danh sách size có sẵn, bạn có thể đặt vào đây
-              value={field.value}
-              onChange={(event, newValue) => {
-                field.onChange(newValue); // Cập nhật giá trị vào react-hook-form
-              }}
-              renderTags={(value, getTagProps) =>
-                value.map((option, index) => (
-                  <Chip
-                    variant="outlined"
-                    label={option}
-                    {...getTagProps({ index })}
-                  />
-                ))
-              }
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  variant="outlined"
-                  placeholder="Nhập Size"
-                  error={!!errors.size}
-                  helperText={errors.size ? errors.size.message : null}
-                />
-              )}
-            />
-          )}
-        />
-
-        <div>
-          <label>Size (Tùy chọn, nhập cách nhau bởi dấu phẩy)</label>
-          <input {...register("size")} />
-          {errors.size && <p>{errors.size.message}</p>}
-        </div>
-
-        <div>
-          <label>Màu (Tùy chọn, nhập cách nhau bởi dấu phẩy)</label>
-          <input {...register("mau")} />
-          {errors.mau && <p>{errors.mau.message}</p>}
-        </div>
 
         {/* Dynamically render product variants if sizes or colors are provided */}
         {productVariants.length > 0 && (

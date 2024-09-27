@@ -444,3 +444,32 @@ export default function CreateSku({ handleClose }) {
         </div>
     )
 }
+
+
+
+ // const onSubmit = (data) => {
+
+
+  //   // Kiểm tra xem giá bán có được nhập khi không có size và màu
+  //   if (!watchSize && !watchMau && !data.gia_ban) {
+  //     alert("Vui lòng nhập giá bán.");
+  //     return;
+  //   }
+
+  //   // Kiểm tra xem tất cả các biến thể đều có giá bán nếu size và màu đã được cung cấp
+  //   const allVariantsValid = productVariants.every(variant => {
+  //     return (variant.size && variant.mau) ? Boolean(variant.gia_ban) : true;
+  //   });
+
+  //   if (!allVariantsValid) {
+  //     alert("Vui lòng nhập giá bán cho tất cả các thuộc tính.");
+  //     return;
+  //   }
+
+  //   const combinedData = {
+  //     ...data,
+  //     productVariants,
+  //   };
+
+  //   console.log("Combined Data:", combinedData);
+  // };

@@ -17,7 +17,7 @@ export const columnsSku = [
   { field: "ten_sp", headerName: "TÊN SẢN PHẨM", width: 250 },
   { field: "ten_full", headerName: "TÊN SP + THUỘC TÍNH ", width: 300 },
   {
-    field: "ma_vach",
+    field: "barcode",
     headerName: "BARCODE",
     width: 150,
   },
