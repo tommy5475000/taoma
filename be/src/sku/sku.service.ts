@@ -14,9 +14,20 @@ export class SkuService {
     let content = await this.prisma.maSku.findMany({
       orderBy: {
         stt_mat_hang: "desc",
-
+      },
+      include: {
+        MaNcc: {
+          select: {
+            ten_thuong_goi: true
+          }
+        }
       }
     })
+    // Gộp tên thường gọi từ nhà cung cấp vào mỗi đối tượng SKU
+    content = content.map(sku => ({
+      ...sku,
+      ten_thuong_goi: sku.MaNcc?.ten_thuong_goi || 'N/A' // Gán tên thường gọi
+    }));
 
     return { messenge: 'Thành Công', content, date: new Date() }
   }
@@ -59,7 +70,6 @@ export class SkuService {
 
       // Định dạng số thứ tự thành 5 chữ số (ví dụ: 00001, 00002, ...)
       let sttSku = nextNumberSku.toString().padStart(5, '0');
-
 
       // Tạo mã SKU cho trường hợp không có biến thể
       let maSku = `${body.loai_hang}${body.ma_ncc}${sttSku}${"00"}`;
@@ -115,7 +125,9 @@ export class SkuService {
       let barCode = `${maLv1}${maLv3}${sttBarCode}${checkSumNumber}`
 
       // Giá bán đã có Vat
-      const giaVat = (body.gia_ban / (1 + (body.loai_thue / 100))).toFixed(2);
+      const giaBan = body.gia_ban.replace(/\./g, "");
+      const giaVat = (giaBan / (1 + (body.loai_thue / 100))).toFixed(2);
+      const formatGiaVat = new Intl.NumberFormat().format(parseFloat(giaVat))
 
       // Tạo một SKU duy nhất cho sản phẩm
       let data = await this.prisma.maSku.create({
@@ -127,6 +139,7 @@ export class SkuService {
           ma_sku: maSku,
           barcode: barCode,
           ten_sp: body.ten_sp,
+          ten_sp_tt: body.ten_sp,
           tt_mau: body.mau || null,
           tt_size: body.size,
           dvt: body.dvt,
@@ -134,7 +147,7 @@ export class SkuService {
           stt_barcode: sttBarCode,
           gia_ban: body.gia_ban,
           thue_suat: body.loai_thue,
-          gia_ban_truoc_vat: giaVat,
+          gia_ban_truoc_vat: formatGiaVat,
           check_sum: body.checksum,
           ngay_tao: body.ngay_tao,
           trang_thai: body.trang_thai,
@@ -155,15 +168,6 @@ export class SkuService {
         },
       });
 
-      // Lấy stt_thuoc_tinh lớn nhất
-      let sttTT = await this.prisma.maSku.findFirst({
-        orderBy: {
-          stt_thuoc_tinh: 'desc',
-        },
-        select: {
-          stt_thuoc_tinh: true,
-        },
-      });
 
       // Kiểm tra nếu có giá trị lớn nhất, nếu không thì bắt đầu từ 1
       let nextNumberSku = sttMatHang && sttMatHang.stt_mat_hang
@@ -251,6 +255,22 @@ export class SkuService {
 
         let barCode = `${maLv1}${maLv3}${sttBarCode}${checkSumNumber}`
 
+
+        // Giá bán đã có Vat
+        const giaBan = variant.gia_ban.replace(/\./g, "");
+        const giaVat = (giaBan / (1 + (body.loai_thue / 100))).toFixed(2);
+        const formatGiaVat = new Intl.NumberFormat().format(parseFloat(giaVat))
+        const formatGiaBan = new Intl.NumberFormat().format(parseFloat(giaBan))
+
+        let fullName = variant.ten_sp;
+
+        if (variant.size) {
+          fullName += ` - ${variant.size}`;
+        }
+
+        if (variant.mau) {
+          fullName += ` - ${variant.mau}`;
+        }
         // Tạo biến thể trong cơ sở dữ liệu
         let dataVariant = await this.prisma.maSku.create({
           data: {
@@ -260,6 +280,7 @@ export class SkuService {
             stt_thuoc_tinh: sttSkuTT,
             ma_sku: maSku,
             ten_sp: variant.ten_sp,
+            ten_sp_tt: fullName,
             tt_mau: variant.mau || null,
             tt_size: variant.size,
             dvt: body.dvt,
@@ -267,7 +288,9 @@ export class SkuService {
             stt_barcode: sttBarCode,
             barcode: barCode,
             check_sum: body.checksum,
-            gia_ban: variant.gia_ban,
+            gia_ban: formatGiaBan,
+            thue_suat: body.loai_thue,
+            gia_ban_truoc_vat: formatGiaVat,
             ngay_tao: body.ngay_tao,
             trang_thai: body.trang_thai,
           },

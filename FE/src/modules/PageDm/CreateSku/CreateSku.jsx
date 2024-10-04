@@ -63,6 +63,7 @@ export default function CreateSku({ handleClose }) {
     register,
     watch,
     handleSubmit,
+    resetField,
     formState: { errors },
   } = useForm({
     defaultValues: {
@@ -79,8 +80,7 @@ export default function CreateSku({ handleClose }) {
     },
     resolver: yupResolver(schema),
     mode: "onTouched"
-  })
-
+  });
 
   const watchSize = watch("size");
   const watchMau = watch("mau");
@@ -95,10 +95,11 @@ export default function CreateSku({ handleClose }) {
       sizes.forEach(size => {
         colors.forEach(mau => {
           variants.push({
-            ten_sp: watchMaHang || "Mã hàng chưa nhập",
-            size: size || "",
-            mau: mau || "",
+            ten_sp: watchMaHang ? capitalizeFirstLetter(watchMaHang) : "Mã hàng chưa nhập",
+            size: size ? capitalizeFirstLetter(size) : "",
+            mau: mau ? capitalizeFirstLetter(mau) : "",
             gia_ban: "",
+            loai_thue: loaiThue,
           });
         });
       });
@@ -118,15 +119,21 @@ export default function CreateSku({ handleClose }) {
         return Promise.reject(); // sẽ báo không đúng sẽ dừng ngay
       }
 
+      if (!watchSize && !watchMau && values.gia_ban <= 0) {
+        alert("Giá bán phải lớn hơn 0.");
+        return Promise.reject(); // Dừng và trả về lỗi nếu giá bán nhỏ hơn hoặc bằng 0
+      }
+
       // Kiểm tra xem tất cả các biến thể đều có giá bán nếu size và màu đã được cung cấp
       const allVariantsValid = productVariants.every(variant => {
-        return (variant.size && variant.mau) ? Boolean(variant.gia_ban) : true;
+        return (variant.gia_ban && variant.gia_ban > 0); // Kiểm tra giá bán phải lớn hơn 0
       });
 
       if (!allVariantsValid) {
-        alert("Vui lòng nhập giá bán cho tất cả các thuộc tính.");
+        alert("Vui lòng nhập giá bán hợp lệ (lớn hơn 0) cho tất cả các thuộc tính.");
         return Promise.reject();
       }
+
       const defaultValues = {
         ...values,
         loai_hang: loaiHang,
@@ -157,8 +164,11 @@ export default function CreateSku({ handleClose }) {
   })
 
   const handleVariantPriceChange = (index, event) => {
+    // Loại bỏ ký tự không phải số
+    const value = event.target.value.replace(/[^0-9]/g, '');
+    // Lưu giá trị thực (số nguyên) vào state
     const newVariants = [...productVariants];
-    newVariants[index].gia_ban = event.target.value;
+    newVariants[index].gia_ban = value;  // Không định dạng tại đây, chỉ lưu số nguyên
     setProductVariants(newVariants);
   };
 
@@ -352,9 +362,15 @@ export default function CreateSku({ handleClose }) {
               Giá bán
             </InputLabel>
             <TextField
-              type="number"
+              type="text"
               error={errors.gia_ban}
-              {...register("gia_ban")}
+              {...register("gia_ban", {
+                onChange: (event) => {
+                  const value = event.target.value.replace(/[^0-9]/g, ''); // Loại bỏ các ký tự không phải số
+                  const formattedValue = new Intl.NumberFormat().format(value); // Định dạng số
+                  event.target.value = formattedValue; // Đặt giá trị đã định dạng
+                },
+              })}
               helperText={errors.gia_ban?.message}
               variant="standard"
               className={style.js12}
@@ -367,22 +383,23 @@ export default function CreateSku({ handleClose }) {
         {/* Dynamically render product variants if sizes or colors are provided */}
         {productVariants.length > 0 && (
           <div>
-            <h3>Danh sách biến thể sản phẩm:</h3>
-            <ul>
+            <h3>Danh sách sản phẩm có thuộc tính:</h3>
+            <ol>
               {productVariants.map((variant, index) => (
                 <li key={index}>
                   <p>Tên sản phẩm: {variant.ten_sp}</p>
                   <p>Size: {variant.size}</p>
                   <p>Màu: {variant.mau}</p>
-                  <input
-                    type="number"
+                  <TextField
+                    variant="standard"
+                    type="text"
                     placeholder="Nhập giá bán"
-                    value={variant.gia_ban}
+                    value={new Intl.NumberFormat().format(variant.gia_ban)}  // Định dạng lại khi hiển thị
                     onChange={(e) => handleVariantPriceChange(index, e)}
                   />
                 </li>
               ))}
-            </ul>
+            </ol>
           </div>
         )}
 

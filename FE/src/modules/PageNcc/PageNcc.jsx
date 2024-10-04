@@ -111,6 +111,7 @@ export default function PageNcc() {
                         handleOpen={handleOpenNCC}
                         handleDelete={handleDelete}
                         handleEdit={handleOpenEditNCC}
+                        currentPage="nhacungcap"
                         data={filteredDataNcc}
                       />
                     </Grid>
